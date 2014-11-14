@@ -94,7 +94,7 @@ const (
 
 ```
 
-Expiration value forms the third argument in `Token` method. It dictates how long a token is valid for. The unit is in (seconds) up to a maximum of 30 days.
+**Expiration** value forms the third argument in `Token` method. It dictates how long a token is valid for. The unit is in (seconds) up to a maximum of 30 days.
 
 
 Methods
