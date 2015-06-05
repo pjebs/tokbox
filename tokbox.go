@@ -80,7 +80,7 @@ type Session struct {
 	PartnerId     string `xml:"partner_id"`
 	CreateDt      string `xml:"create_dt"`
 	SessionStatus string `xml:"session_status"`
-	t             *Tokbox
+	T             *Tokbox
 }
 
 func New(apikey, partnerSecret string) *Tokbox {
@@ -124,7 +124,7 @@ func (t *Tokbox) NewSession(location string, mm MediaMode) (*Session, error) {
 	}
 
 	o := s.Sessions[0]
-	o.t = t
+	o.T = t
 	return &o, nil
 }
 
@@ -145,7 +145,7 @@ func (s *Session) Token(role Role, connectionData string, expiration int64) (str
 	}
 	dataStr += "&nonce=" + url.QueryEscape(fmt.Sprintf("%d", rand.Intn(999999)))
 
-	h := hmac.New(sha1.New, []byte(s.t.partnerSecret))
+	h := hmac.New(sha1.New, []byte(s.T.partnerSecret))
 	n, err := h.Write([]byte(dataStr))
 	if err != nil {
 		return "", err
@@ -155,7 +155,7 @@ func (s *Session) Token(role Role, connectionData string, expiration int64) (str
 	}
 
 	preCoded := ""
-	preCoded += "partner_id=" + s.t.apiKey
+	preCoded += "partner_id=" + s.T.apiKey
 	preCoded += "&sig=" + fmt.Sprintf("%x:%s", h.Sum(nil), dataStr)
 
 	var buf bytes.Buffer
