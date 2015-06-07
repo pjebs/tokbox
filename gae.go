@@ -3,12 +3,14 @@
 package tokbox
 
 import (
+	"appengine"
+	"appengine/urlfetch"
 	"net/http"
 )
 
-func client() *http.Client {
+func client(r *http.Request) *http.Client {
 
-	transport := http.Transport{}
+	c := appengine.NewContext(r)
+	return urlfetch.Client(c)
 
-	return &http.Client{Transport: &transport}
 }

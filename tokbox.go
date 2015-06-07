@@ -87,7 +87,7 @@ func New(apikey, partnerSecret string) *Tokbox {
 	return &Tokbox{apikey, partnerSecret}
 }
 
-func (t *Tokbox) NewSession(location string, mm MediaMode) (*Session, error) {
+func (t *Tokbox) NewSession(location string, mm MediaMode, r ...*http.Request) (*Session, error) {
 	params := url.Values{}
 
 	if len(location) > 0 {
@@ -104,7 +104,10 @@ func (t *Tokbox) NewSession(location string, mm MediaMode) (*Session, error) {
 	authHeader := t.apiKey + ":" + t.partnerSecret
 	req.Header.Add("X-TB-PARTNER-AUTH", authHeader)
 
-	res, err := client().Do(req)
+	if len(r) == 0 {
+		r = append(r, nil)
+	}
+	res, err := client(r[0]).Do(req)
 	defer res.Body.Close()
 	if err != nil {
 		return nil, err
