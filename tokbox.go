@@ -108,10 +108,10 @@ func (t *Tokbox) NewSession(location string, mm MediaMode, r ...*http.Request) (
 		r = append(r, nil)
 	}
 	res, err := client(r[0]).Do(req)
-	defer res.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
 		return nil, fmt.Errorf("Tokbox returns error code: %v", res.StatusCode)

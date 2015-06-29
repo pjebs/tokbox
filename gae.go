@@ -9,8 +9,6 @@ import (
 )
 
 func client(r *http.Request) *http.Client {
-
 	c := appengine.NewContext(r)
 	return urlfetch.Client(c)
-
 }
