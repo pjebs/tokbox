@@ -85,7 +85,7 @@ type Session struct {
 }
 
 func New(apikey, partnerSecret string) *Tokbox {
-	return &Tokbox{apikey, partnerSecret}
+	return &Tokbox{apikey, partnerSecret, ""}
 }
 
 func (t *Tokbox) NewSession(location string, mm MediaMode, r ...*http.Request) (*Session, error) {
