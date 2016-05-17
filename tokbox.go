@@ -73,6 +73,7 @@ type sessions struct {
 type Tokbox struct {
 	apiKey        string
 	partnerSecret string
+	BetaUrl       string //Endpoint for Beta Programs
 }
 
 type Session struct {
@@ -96,7 +97,13 @@ func (t *Tokbox) NewSession(location string, mm MediaMode, r ...*http.Request) (
 
 	params.Add("p2p.preference", string(mm))
 
-	req, err := http.NewRequest("POST", apiHost+apiSession, strings.NewReader(params.Encode()))
+	var endpoint string
+	if t.BetaUrl == "" {
+		endpoint = apiHost
+	} else {
+		endpoint = t.BetaUrl
+	}
+	req, err := http.NewRequest("POST", endpoint+apiSession, strings.NewReader(params.Encode()))
 	if err != nil {
 		return nil, err
 	}
