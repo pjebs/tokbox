@@ -3,12 +3,15 @@
 package tokbox
 
 import (
-	"appengine"
-	"appengine/urlfetch"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine/urlfetch"
 	"net/http"
 )
 
-func client(r *http.Request) *http.Client {
-	c := appengine.NewContext(r)
-	return urlfetch.Client(c)
+func client(ctx *context.Context) *http.Client {
+	if ctx == nil {
+		return &http.Client{}
+	} else {
+		return urlfetch.Client(*ctx)
+	}
 }

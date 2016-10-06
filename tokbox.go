@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"sync"
+
+	"golang.org/x/net/context"
 )
 
 const (
@@ -88,7 +90,7 @@ func New(apikey, partnerSecret string) *Tokbox {
 	return &Tokbox{apikey, partnerSecret, ""}
 }
 
-func (t *Tokbox) NewSession(location string, mm MediaMode, r ...*http.Request) (*Session, error) {
+func (t *Tokbox) NewSession(location string, mm MediaMode, ctx ...*context.Context) (*Session, error) {
 	params := url.Values{}
 
 	if len(location) > 0 {
@@ -111,10 +113,10 @@ func (t *Tokbox) NewSession(location string, mm MediaMode, r ...*http.Request) (
 	authHeader := t.apiKey + ":" + t.partnerSecret
 	req.Header.Add("X-TB-PARTNER-AUTH", authHeader)
 
-	if len(r) == 0 {
-		r = append(r, nil)
+	if len(ctx) == 0 {
+		ctx = append(ctx, nil)
 	}
-	res, err := client(r[0]).Do(req)
+	res, err := client(ctx[0]).Do(req)
 	if err != nil {
 		return nil, err
 	}

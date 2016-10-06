@@ -3,9 +3,10 @@
 package tokbox
 
 import (
+	"golang.org/x/net/context"
 	"net/http"
 )
 
-func client(r *http.Request) *http.Client {
+func client(ctx *context.Context) *http.Client {
 	return &http.Client{}
 }
