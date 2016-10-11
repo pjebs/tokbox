@@ -140,11 +140,11 @@ func (t *Tokbox) NewSession(location string, mm MediaMode, ctx ...*context.Conte
 	return &o, nil
 }
 
-func (s *Session) Token(role Role, connectionData string, expiration int64) (string, error) {
+func (t *Tokbox) Token(sessionId string, role Role, connectionData string, expiration int64) (string, error) {
 	now := time.Now().UTC().Unix()
 
 	dataStr := ""
-	dataStr += "session_id=" + url.QueryEscape(s.SessionId)
+	dataStr += "session_id=" + url.QueryEscape(sessionId)
 	dataStr += "&create_time=" + url.QueryEscape(fmt.Sprintf("%d", now))
 	if expiration > 0 {
 		dataStr += "&expire_time=" + url.QueryEscape(fmt.Sprintf("%d", now+expiration))
@@ -157,7 +157,7 @@ func (s *Session) Token(role Role, connectionData string, expiration int64) (str
 	}
 	dataStr += "&nonce=" + url.QueryEscape(fmt.Sprintf("%d", rand.Intn(999999)))
 
-	h := hmac.New(sha1.New, []byte(s.T.partnerSecret))
+	h := hmac.New(sha1.New, []byte(t.partnerSecret))
 	n, err := h.Write([]byte(dataStr))
 	if err != nil {
 		return "", err
@@ -167,7 +167,7 @@ func (s *Session) Token(role Role, connectionData string, expiration int64) (str
 	}
 
 	preCoded := ""
-	preCoded += "partner_id=" + s.T.apiKey
+	preCoded += "partner_id=" + t.apiKey
 	preCoded += "&sig=" + fmt.Sprintf("%x:%s", h.Sum(nil), dataStr)
 
 	var buf bytes.Buffer
@@ -177,7 +177,7 @@ func (s *Session) Token(role Role, connectionData string, expiration int64) (str
 	return fmt.Sprintf("T1==%s", buf.String()), nil
 }
 
-func (s *Session) Tokens(n int, multithread bool, role Role, connectionData string, expiration int64) []string {
+func (t *Tokbox) Tokens(sessionId string, n int, multithread bool, role Role, connectionData string, expiration int64) []string {
 	ret := []string{}
 
 	if multithread {
@@ -187,7 +187,7 @@ func (s *Session) Tokens(n int, multithread bool, role Role, connectionData stri
 
 		for i := 0; i < n; i++ {
 			go func(role Role, connectionData string, expiration int64) {
-				a, e := s.Token(role, connectionData, expiration)
+				a, e := t.Token(sessionId, role, connectionData, expiration)
 				if e == nil {
 					lock.Lock()
 					ret = append(ret, a)
@@ -203,11 +203,19 @@ func (s *Session) Tokens(n int, multithread bool, role Role, connectionData stri
 	} else {
 		for i := 0; i < n; i++ {
 
-			a, e := s.Token(role, connectionData, expiration)
+			a, e := t.Token(sessionId, role, connectionData, expiration)
 			if e == nil {
 				ret = append(ret, a)
 			}
 		}
 		return ret
 	}
+}
+
+func (s *Session) Token(role Role, connectionData string, expiration int64) (string, error) {
+	return s.T.Token(s.SessionId, role, connectionData, expiration)
+}
+
+func (s *Session) Tokens(n int, multithread bool, role Role, connectionData string, expiration int64) []string {
+	return s.T.Tokens(s.SessionId, n, multithread, role, connectionData, expiration)
 }
