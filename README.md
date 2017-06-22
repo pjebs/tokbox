@@ -7,8 +7,6 @@ This Library is for creating sessions and tokens for the Tokbox Video, Voice & M
 It is a hybrid library (supports **Google App Engine** and **Stand-Alone** binary).
 It supports **multi-threading** for faster generation of tokens.
 
-**WARNING:** This library uses the **deprecated** api which is only valid until July 2017. I will update this library to the [new API](https://www.tokbox.com/developer/rest/#authentication) before that date.
-
 Install
 -------
 

@@ -7,7 +7,7 @@ import (
 	"net/url"
 
 	"encoding/base64"
-	"encoding/xml"
+	"encoding/json"
 
 	"crypto/hmac"
 	"crypto/sha1"
@@ -20,10 +20,13 @@ import (
 	"sync"
 
 	"golang.org/x/net/context"
+
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/twinj/uuid"
 )
 
 const (
-	apiHost    = "https://api.opentok.com/hl"
+	apiHost    = "https://api.opentok.com"
 	apiSession = "/session/create"
 )
 
@@ -68,10 +71,6 @@ const (
 	Moderator = "moderator"
 )
 
-type sessions struct {
-	Sessions []Session `xml:"Session"`
-}
-
 type Tokbox struct {
 	apiKey        string
 	partnerSecret string
@@ -79,17 +78,42 @@ type Tokbox struct {
 }
 
 type Session struct {
-	SessionId     string `xml:"session_id"`
-	PartnerId     string `xml:"partner_id"`
-	CreateDt      string `xml:"create_dt"`
-	SessionStatus string `xml:"session_status"`
-	T             *Tokbox
+	SessionId      string  `json:"session_id"`
+	ProjectId      string  `json:"project_id"`
+	PartnerId      string  `json:"partner_id"`
+	CreateDt       string  `json:"create_dt"`
+	SessionStatus  string  `json:"session_status"`
+	MediaServerURL string  `json:"media_server_url"`
+	T              *Tokbox `json:"-"`
 }
 
 func New(apikey, partnerSecret string) *Tokbox {
 	return &Tokbox{apikey, partnerSecret, ""}
 }
 
+func (t *Tokbox) jwtToken() (string, error) {
+
+	type TokboxClaims struct {
+		Ist string `json:"ist,omitempty"`
+		jwt.StandardClaims
+	}
+
+	claims := TokboxClaims{
+		"project",
+		jwt.StandardClaims{
+			Issuer:    t.apiKey,
+			IssuedAt:  time.Now().UTC().Unix(),
+			ExpiresAt: time.Now().UTC().Unix() + (2 * 24 * 60 * 60), // 2 hours; //NB: The maximum allowed expiration time range is 5 minutes.
+			Id:        string(uuid.NewV4()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(t.partnerSecret))
+}
+
+// Creates a new tokbox session or returns an error.
+// See README file for full documentation: https://github.com/pjebs/tokbox
+// NOTE: ctx must be nil if *not* using Google App Engine
 func (t *Tokbox) NewSession(location string, mm MediaMode, ctx ...*context.Context) (*Session, error) {
 	params := url.Values{}
 
@@ -110,8 +134,14 @@ func (t *Tokbox) NewSession(location string, mm MediaMode, ctx ...*context.Conte
 		return nil, err
 	}
 
-	authHeader := t.apiKey + ":" + t.partnerSecret
-	req.Header.Add("X-TB-PARTNER-AUTH", authHeader)
+	//Create jwt token
+	jwt, err := t.jwtToken()
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("X-OPENTOK-AUTH", jwt)
 
 	if len(ctx) == 0 {
 		ctx = append(ctx, nil)
@@ -126,16 +156,16 @@ func (t *Tokbox) NewSession(location string, mm MediaMode, ctx ...*context.Conte
 		return nil, fmt.Errorf("Tokbox returns error code: %v", res.StatusCode)
 	}
 
-	var s sessions
-	if err = xml.NewDecoder(res.Body).Decode(&s); err != nil {
+	var s []Session
+	if err = json.NewDecoder(res.Body).Decode(&s); err != nil {
 		return nil, err
 	}
 
-	if len(s.Sessions) < 1 {
+	if len(s) < 1 {
 		return nil, fmt.Errorf("Tokbox did not return a session")
 	}
 
-	o := s.Sessions[0]
+	o := s[0]
 	o.T = t
 	return &o, nil
 }
