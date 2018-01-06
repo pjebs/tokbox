@@ -7,6 +7,6 @@ import (
 	"net/http"
 )
 
-func client(ctx *context.Context) *http.Client {
+func client(ctx context.Context) *http.Client {
 	return &http.Client{}
 }

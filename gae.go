@@ -8,10 +8,10 @@ import (
 	"net/http"
 )
 
-func client(ctx *context.Context) *http.Client {
+func client(ctx context.Context) *http.Client {
 	if ctx == nil {
 		return &http.Client{}
 	} else {
-		return urlfetch.Client(*ctx)
+		return urlfetch.Client(ctx)
 	}
 }
