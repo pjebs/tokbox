@@ -74,16 +74,31 @@ type ArchiveOptions struct {
 
 // request body
 type ArchiveReq struct {
-	SessionID string `json:"sessionId"`
-	HasAudio  bool   `json:"hasAudio"`
-	HasVideo  bool   `json:"hasVideo"`
-	Layout    struct {
-		Type       string `json:"type"`       // bestFit | custom | horizontalPresentation | pip | verticalPresentation
-		Stylesheet string `json:"stylesheet"` // only used with type == custom
-	} `json:"layout"`
+	SessionID  string `json:"sessionId"`
+	HasAudio   bool   `json:"hasAudio"`
+	HasVideo   bool   `json:"hasVideo"`
+	Layout     Layout `json:"layout"`
 	Name       string `json:"name"`       // (Optional) The name of the archive (for your own identification)
 	OutputMode string `json:"outputMode"` // composed (default) | individual
 	Resolution string `json:"resolution"` // 640x480 (default) | 1280x720
+}
+type Layout struct {
+	Type       string `json:"type" `                // bestFit | custom | horizontalPresentation | pip | verticalPresentation
+	Stylesheet string `json:"stylesheet,omitempty"` // only used with type == custom
+}
+
+func DefaultArchiveReq(sessionId, name string) ArchiveReq {
+	return ArchiveReq{
+		SessionID: sessionId,
+		HasAudio:  true,
+		HasVideo:  true,
+		Layout: Layout{
+			Type: "bestFit",
+		},
+		Name:       name,
+		OutputMode: "composed",
+		Resolution: "640x480",
+	}
 }
 
 // response

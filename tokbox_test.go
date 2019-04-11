@@ -30,20 +30,27 @@ func TestToken(t *testing.T) {
 }
 func TestArchiveStart(t *testing.T) {
 	sessionId := ""
-	resp, err := tb.Archive.Start(ArchiveReq{
-		SessionID: sessionId,
-	})
+	resp, err := tb.Archive.Start(DefaultArchiveReq(sessionId, "test"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Println(resp)
+	log.Println(resp.Json())
+}
+func TestArchiveStop(t *testing.T) {
+	archiveId := ""
+	resp, err := tb.Archive.Stop(archiveId)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Println(resp.Json())
+
 }
 func TestArchiveList(t *testing.T) {
 	resp, err := tb.Archive.List(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Println(resp)
+	log.Println(resp.Json())
 }
 
 func TestArchiveGet(t *testing.T) {
@@ -52,7 +59,7 @@ func TestArchiveGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Println(resp)
+	log.Println(resp.Json())
 
 }
 func TestArchiveDelete(t *testing.T) {
