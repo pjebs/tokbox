@@ -2,26 +2,21 @@ package tokbox
 
 import (
 	"bytes"
+	"github.com/google/go-querystring/query"
+	"io/ioutil"
 
 	"net/http"
 	"net/url"
 
-	"encoding/base64"
 	"encoding/json"
 
-	"crypto/hmac"
-	"crypto/sha1"
-
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
-	"sync"
-
 	"golang.org/x/net/context"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/myesui/uuid"
 )
 
@@ -72,23 +67,25 @@ const (
 )
 
 type Tokbox struct {
+	Client        *http.Client
 	apiKey        string
 	partnerSecret string
-	BetaUrl       string //Endpoint for Beta Programs
-}
-
-type Session struct {
-	SessionId      string  `json:"session_id"`
-	ProjectId      string  `json:"project_id"`
-	PartnerId      string  `json:"partner_id"`
-	CreateDt       string  `json:"create_dt"`
-	SessionStatus  string  `json:"session_status"`
-	MediaServerURL string  `json:"media_server_url"`
-	T              *Tokbox `json:"-"`
+	BetaUrl       string         //Endpoint for Beta Programs
+	Archive       ArchiveService // Archive sdk
+	Stream        StreamService  // Stream sdk
 }
 
 func New(apikey, partnerSecret string) *Tokbox {
-	return &Tokbox{apikey, partnerSecret, ""}
+	//return &Tokbox{apikey, partnerSecret, "",nil}
+	tb := &Tokbox{
+		Client:        http.DefaultClient,
+		apiKey:        apikey,
+		partnerSecret: partnerSecret,
+		BetaUrl:       "",
+	}
+	tb.Archive = &ArchiveServiceOp{tb}
+	tb.Stream = &StreamServiceOp{tb}
+	return tb
 }
 
 func (t *Tokbox) jwtToken() (string, error) {
@@ -170,74 +167,103 @@ func (t *Tokbox) NewSession(location string, mm MediaMode, ctx ...context.Contex
 	return &o, nil
 }
 
-func (s *Session) Token(role Role, connectionData string, expiration int64) (string, error) {
-	now := time.Now().UTC().Unix()
-
-	dataStr := ""
-	dataStr += "session_id=" + url.QueryEscape(s.SessionId)
-	dataStr += "&create_time=" + url.QueryEscape(fmt.Sprintf("%d", now))
-	if expiration > 0 {
-		dataStr += "&expire_time=" + url.QueryEscape(fmt.Sprintf("%d", now+expiration))
-	}
-	if len(role) > 0 {
-		dataStr += "&role=" + url.QueryEscape(string(role))
-	}
-	if len(connectionData) > 0 {
-		dataStr += "&connection_data=" + url.QueryEscape(connectionData)
-	}
-	dataStr += "&nonce=" + url.QueryEscape(fmt.Sprintf("%d", rand.Intn(999999)))
-
-	h := hmac.New(sha1.New, []byte(s.T.partnerSecret))
-	n, err := h.Write([]byte(dataStr))
+func (this *Tokbox) NewRequest(method, urlStr string, body, options interface{}) (*http.Request, error) {
+	rel, err := url.Parse(urlStr)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if n != len(dataStr) {
-		return "", fmt.Errorf("hmac not enough bytes written %d != %d", n, len(dataStr))
-	}
-
-	preCoded := ""
-	preCoded += "partner_id=" + s.T.apiKey
-	preCoded += "&sig=" + fmt.Sprintf("%x:%s", h.Sum(nil), dataStr)
-
-	var buf bytes.Buffer
-	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
-	encoder.Write([]byte(preCoded))
-	encoder.Close()
-	return fmt.Sprintf("T1==%s", buf.String()), nil
-}
-
-func (s *Session) Tokens(n int, multithread bool, role Role, connectionData string, expiration int64) []string {
-	ret := []string{}
-
-	if multithread {
-		var w sync.WaitGroup
-		var lock sync.Mutex
-		w.Add(n)
-
-		for i := 0; i < n; i++ {
-			go func(role Role, connectionData string, expiration int64) {
-				a, e := s.Token(role, connectionData, expiration)
-				if e == nil {
-					lock.Lock()
-					ret = append(ret, a)
-					lock.Unlock()
-				}
-				w.Done()
-			}(role, connectionData, expiration)
-
+	if options != nil {
+		optionsQuery, err := query.Values(options)
+		if err != nil {
+			return nil, err
 		}
-
-		w.Wait()
-		return ret
-	} else {
-		for i := 0; i < n; i++ {
-
-			a, e := s.Token(role, connectionData, expiration)
-			if e == nil {
-				ret = append(ret, a)
+		for k, values := range rel.Query() {
+			for _, v := range values {
+				optionsQuery.Add(k, v)
 			}
 		}
-		return ret
 	}
+	var js []byte = nil
+	if body != nil {
+		js, err = json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	req, err := http.NewRequest(method, rel.String(), bytes.NewBuffer(js))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+	token, err := this.jwtToken()
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("X-OPENTOK-AUTH", token)
+	return req, nil
+
+}
+
+func (this *Tokbox) CreateAndDo(method, path string, data, options, resource interface{}) error {
+	req, err := this.NewRequest(method, path, data, options)
+	if err != nil {
+		return err
+	}
+	err = this.Do(req, resource)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (this *Tokbox) Do(req *http.Request, v interface{}) error {
+	resp, err := this.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	err = CheckResponseError(resp)
+	if err != nil {
+		return err
+	}
+	if v != nil {
+		decoder := json.NewDecoder(resp.Body)
+		err := decoder.Decode(&v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func CheckResponseError(resp *http.Response) error {
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	responseError := &ResponseError{}
+	err = json.Unmarshal(bodyBytes, responseError)
+	if err != nil {
+		responseError.Code = resp.StatusCode
+		responseError.Message = string(bodyBytes)
+		responseError.Description = codeErrDict[resp.StatusCode]
+	}
+	return responseError
+}
+
+func (this *Tokbox) Get(path string, resource, options interface{}) error {
+	return this.CreateAndDo("GET", path, nil, options, resource)
+}
+func (this *Tokbox) Post(path string, data, resource interface{}) error {
+	return this.CreateAndDo("POST", path, data, nil, resource)
+}
+func (this *Tokbox) Put(path string, data, resource interface{}) error {
+	return this.CreateAndDo("PUT", path, data, nil, resource)
+}
+func (this *Tokbox) Delete(path string, resource, options interface{}) error {
+	return this.CreateAndDo("DELETE", path, nil, options, resource)
 }
