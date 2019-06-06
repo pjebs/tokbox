@@ -72,6 +72,7 @@ type Tokbox struct {
 	partnerSecret string
 	BetaUrl       string         //Endpoint for Beta Programs
 	Archive       ArchiveService // Archive sdk
+	Stream        StreamService  // Stream sdk
 }
 
 func New(apikey, partnerSecret string) *Tokbox {
@@ -83,6 +84,7 @@ func New(apikey, partnerSecret string) *Tokbox {
 		BetaUrl:       "",
 	}
 	tb.Archive = &ArchiveServiceOp{tb}
+	tb.Stream = &StreamServiceOp{tb}
 	return tb
 }
 
